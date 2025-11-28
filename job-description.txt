@@ -1,0 +1,38 @@
+Senior Backend Engineer (Node.js/NestJS)
+We are seeking a highly skilled Senior Backend Engineer with deep expertise in Node.js and NestJS to design, build, and scale production-grade backend systems and microservices.
+Requirements
+Experience
+5+ years backend engineering with Node.js
+3–5 years hands-on NestJS (must have completed multiple production projects)
+Experience with high-scale, distributed, or mission-critical systems
+Backend & Architecture
+Expert in NestJS (modules, DI, providers, interceptors, pipes, guards, filters)
+Strong understanding of Node.js internals
+Solid grasp of Clean Architecture, SOLID, DDD, Hexagonal/Onion
+Familiarity with CQRS and event-driven patterns
+Strong REST API design (GraphQL a plus)
+Microservices & Distributed Systems
+Built and maintained microservices in production
+Experience with message brokers (Kafka, RabbitMQ, SQS/SNS, NATS, Redis Streams)
+Knowledge of retries, idempotency, circuit breakers, Sagas/Outbox
+Databases & Caching
+Strong SQL skills
+PostgreSQL/MySQL in production
+TypeORM or Prisma mastery
+Redis/Memcached experience
+Testing & Quality
+Expert with Jest (unit, integration, e2e)
+Strong DI testing, mocking, CI/CD quality enforcement
+Production Readiness
+Security best practices (validation, JWT/RBAC, rate limiting)
+Monitoring/observability (Datadog, Prometheus, ELK, OTel)
+Performance profiling and debugging
+Zero-downtime deployments, AWS experience
+DevOps Fluency
+Docker, CI/CD (GitHub Actions/GitLab)
+Kubernetes/ECS (preferred)
+Basic IaC (Terraform/CloudFormation)
+Soft Skills
+Strong communication and technical leadership
+Code reviews, mentorship, ownership mentality
+Comfortable in distributed/remote teams

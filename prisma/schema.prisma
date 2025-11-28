@@ -1,0 +1,267 @@
+// =====================================================
+// Multi-Tenant RBAC System - Prisma Schema
+// Strategy: Schema-per-Tenant (each tenant gets own schema)
+// =====================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================
+// PUBLIC SCHEMA - Tenant Management
+// =====================================================
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+model Tenant {
+  id         String       @id @default(uuid())
+  name       String
+  slug       String       @unique
+  domain     String?      @unique // Optional custom domain
+  schema     String       @unique // PostgreSQL schema name (e.g., "tenant_abc123")
+  status     TenantStatus @default(ACTIVE)
+  config     Json?        // Tenant-specific configuration
+  maxUsers   Int          @default(100)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  
+  // Audit
+  createdBy  String?
+  
+  @@index([status])
+  @@index([slug])
+  @@map("tenants")
+}
+
+// =====================================================
+// TENANT SCHEMA - User & RBAC Models
+// Note: These models exist in each tenant's schema
+// =====================================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+model User {
+  id              String     @id @default(uuid())
+  email           String     @unique
+  password        String // Hashed with bcrypt
+  firstName       String
+  lastName        String
+  phone           String?
+  avatar          String?
+  status          UserStatus @default(PENDING_VERIFICATION)
+  emailVerified   Boolean    @default(false)
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  lastLoginIp     String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  
+  // Relations
+  roles           UserRole[]
+  sessions        Session[]
+  auditLogs       AuditLog[] @relation("UserAuditLogs")
+  createdAudits   AuditLog[] @relation("CreatedByAudits")
+  
+  @@index([email])
+  @@index([status])
+  @@map("users")
+}
+
+// =====================================================
+// RBAC - Junction Table for User-Role Relationship
+// =====================================================
+
+model UserRole {
+  id         String   @id @default(uuid())
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  assignedBy String? // User ID who assigned this role
+  expiresAt  DateTime? // Optional: role expiration
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+// =====================================================
+// RBAC - Roles
+// =====================================================
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g., "SUPER_ADMIN", "ADMIN", "USER", "MANAGER"
+  displayName String // Human-readable name
+  description String?
+  isSystem    Boolean  @default(false) // System roles can't be deleted
+  priority    Int      @default(0) // Higher priority = more permissions
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  users       UserRole[]
+  permissions RolePermission[]
+  
+  @@index([name])
+  @@index([isSystem])
+  @@map("roles")
+}
+
+// =====================================================
+// RBAC - Permissions
+// =====================================================
+
+model Permission {
+  id          String   @id @default(uuid())
+  resource    String // e.g., "users", "products", "orders"
+  action      String // e.g., "create", "read", "update", "delete", "list"
+  conditions  Json? // Optional: ABAC conditions (attribute-based)
+  description String?
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  roles RolePermission[]
+  
+  @@unique([resource, action])
+  @@index([resource])
+  @@map("permissions")
+}
+
+// =====================================================
+// RBAC - Junction Table for Role-Permission Relationship
+// =====================================================
+
+model RolePermission {
+  id           String   @id @default(uuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+// =====================================================
+// Authentication - Sessions
+// =====================================================
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([refreshToken])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// =====================================================
+// Security - Audit Logs
+// =====================================================
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  PERMISSION_GRANT
+  PERMISSION_REVOKE
+  ROLE_ASSIGN
+  ROLE_REMOVE
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  userId     String
+  action     AuditAction
+  resource   String // e.g., "users", "roles"
+  resourceId String? // ID of affected resource
+  metadata   Json? // Additional context
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+  createdBy  String? // For system-initiated actions
+  
+  // Relations
+  user         User  @relation("UserAuditLogs", fields: [userId], references: [id])
+  createdByUser User? @relation("CreatedByAudits", fields: [createdBy], references: [id])
+  
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// =====================================================
+// Password Reset Tokens
+// =====================================================
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  @@index([email])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+// =====================================================
+// Email Verification Tokens
+// =====================================================
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  @@index([email])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
