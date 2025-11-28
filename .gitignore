@@ -38,3 +38,6 @@ prisma/dev.db
 
 # Docker
 docker-compose.override.yml
+
+# Job description (private)
+job-description.txt
