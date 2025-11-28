@@ -2,12 +2,12 @@ import { registerAs } from '@nestjs/config';
 
 export const appConfig = registerAs('app', () => ({
     nodeEnv: process.env.NODE_ENV || 'development',
-    port: parseInt(process.env.PORT, 10) || 3000,
+    port: parseInt(process.env.PORT || '3000', 10),
     apiPrefix: process.env.API_PREFIX || 'api/v1',
     name: process.env.APP_NAME || 'NestJS Multi-Tenant RBAC',
 
     // Security
-    bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS, 10) || 12,
+    bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10),
     sessionSecret: process.env.SESSION_SECRET || 'change-me-in-production',
 
     // CORS
