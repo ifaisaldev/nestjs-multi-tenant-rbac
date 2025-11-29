@@ -10,34 +10,30 @@ export class UsersService {
     async findAll(tenantId: string, pagination: { page: number; limit: number }) {
         return this.prisma.run(async (tx) => {
             const { page, limit } = pagination;
-            const skip = (page - 1) * limit;
+            const offset = (page - 1) * limit;
 
-            const [users, total] = await Promise.all([
-                tx.user.findMany({
-                    skip,
-                    take: limit,
-                    orderBy: { createdAt: 'desc' },
-                    select: {
-                        id: true,
-                        email: true,
-                        firstName: true,
-                        lastName: true,
-                        status: true,
-                        createdAt: true,
-                        roles: {
-                            select: {
-                                role: {
-                                    select: {
-                                        name: true,
-                                        displayName: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                }),
-                tx.user.count(),
-            ]);
+            // Get users with raw query
+            const users: any[] = await tx.$queryRaw`
+                SELECT u.id, u.email, u."firstName", u."lastName", u.status, u."createdAt"
+                FROM "users" u
+                ORDER BY u."createdAt" DESC
+                LIMIT ${limit} OFFSET ${offset}
+            `;
+
+            // Get total count
+            const countResult: any[] = await tx.$queryRaw`SELECT COUNT(*)::int as count FROM "users"`;
+            const total = countResult[0]?.count || 0;
+
+            // Get roles for each user
+            for (const user of users) {
+                const roles: any[] = await tx.$queryRaw`
+                    SELECT r.name, r."displayName"
+                    FROM "roles" r
+                    JOIN "user_roles" ur ON ur."roleId" = r.id
+                    WHERE ur."userId" = ${user.id}
+                `;
+                user.roles = roles.map(r => ({ role: { name: r.name, displayName: r.displayName } }));
+            }
 
             return {
                 data: users,
