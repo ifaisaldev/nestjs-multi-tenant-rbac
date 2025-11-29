@@ -23,10 +23,14 @@ import { CreateTenantDto, UpdateTenantDto } from './dto';
 import { RolesGuard } from '@/rbac/guards/roles.guard';
 import { Roles } from '@/rbac/decorators/roles.decorator';
 import { Public } from '@/auth/decorators';
+import { Audit } from '@/audit/decorators/audit.decorator';
+import { UseInterceptors } from '@nestjs/common';
+import { AuditInterceptor } from '@/audit/interceptors/audit.interceptor';
 
 @ApiTags('Tenants')
 @Controller('tenants')
 @ApiBearerAuth('access-token')
+@UseInterceptors(AuditInterceptor)
 export class TenantController {
     constructor(private tenantService: TenantService) { }
 
@@ -35,6 +39,7 @@ export class TenantController {
     @ApiOperation({ summary: 'Create new tenant with automatic schema setup' })
     @ApiResponse({ status: 201, description: 'Tenant created successfully' })
     @ApiResponse({ status: 409, description: 'Tenant already exists' })
+    @Audit('tenants', 'create')
     async create(@Body() createTenantDto: CreateTenantDto) {
         return this.tenantService.create(createTenantDto);
     }
@@ -70,6 +75,7 @@ export class TenantController {
     @ApiOperation({ summary: 'Update tenant (SUPER_ADMIN only)' })
     @ApiResponse({ status: 200, description: 'Tenant updated successfully' })
     @ApiResponse({ status: 404, description: 'Tenant not found' })
+    @Audit('tenants', 'update')
     async update(
         @Param('id') id: string,
         @Body() updateTenantDto: UpdateTenantDto,
@@ -84,6 +90,7 @@ export class TenantController {
     @ApiOperation({ summary: 'Soft delete tenant (SUPER_ADMIN only)' })
     @ApiResponse({ status: 200, description: 'Tenant deactivated successfully' })
     @ApiResponse({ status: 404, description: 'Tenant not found' })
+    @Audit('tenants', 'delete')
     async remove(@Param('id') id: string) {
         return this.tenantService.remove(id);
     }
@@ -98,6 +105,7 @@ export class TenantController {
     })
     @ApiResponse({ status: 200, description: 'Tenant permanently deleted' })
     @ApiResponse({ status: 404, description: 'Tenant not found' })
+    @Audit('tenants', 'hard-delete')
     async hardDelete(@Param('id') id: string) {
         return this.tenantService.hardDelete(id);
     }

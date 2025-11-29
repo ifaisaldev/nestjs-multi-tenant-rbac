@@ -8,7 +8,7 @@ import { getTenantId } from '../tenant/tenant-context';
  * Creates a Prisma client instance connected to a specific tenant's schema
  * Scope: REQUEST - each request gets its own instance
  */
-@Injectable({ scope: Scope.REQUEST })
+@Injectable()
 export class TenantPrismaService extends PrismaClient implements OnModuleInit {
     private readonly logger = new Logger(TenantPrismaService.name);
     private tenantSchema: string;

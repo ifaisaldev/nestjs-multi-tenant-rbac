@@ -11,6 +11,7 @@ import {
     HttpCode,
     HttpStatus,
     Headers,
+    UseInterceptors,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -27,10 +28,13 @@ import { RolesGuard } from '@/rbac/guards/roles.guard';
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 import { Roles } from '@/rbac/decorators/roles.decorator';
 import { Permissions } from '@/rbac/decorators/permissions.decorator';
+import { Audit } from '@/audit/decorators/audit.decorator';
+import { AuditInterceptor } from '@/audit/interceptors/audit.interceptor';
 
 @ApiTags('Users')
 @Controller('users')
 @ApiBearerAuth('access-token')
+@UseInterceptors(AuditInterceptor)
 export class UsersController {
     constructor(private usersService: UsersService) { }
 
@@ -71,6 +75,7 @@ export class UsersController {
     @ApiResponse({ status: 201, description: 'User created successfully' })
     @ApiResponse({ status: 403, description: 'Forbidden - Missing required role' })
     @ApiResponse({ status: 409, description: 'User already exists' })
+    @Audit('users', 'create')
     async create(@Headers('x-tenant-id') tenantId: string, @Body() createUserDto: CreateUserDto) {
         return this.usersService.create(tenantId, createUserDto);
     }
@@ -83,6 +88,7 @@ export class UsersController {
     @ApiResponse({ status: 200, description: 'User updated successfully' })
     @ApiResponse({ status: 404, description: 'User not found' })
     @ApiResponse({ status: 403, description: 'Forbidden - Missing permission' })
+    @Audit('users', 'update')
     async update(
         @Headers('x-tenant-id') tenantId: string,
         @Param('id') id: string,
@@ -103,6 +109,7 @@ export class UsersController {
     @ApiResponse({ status: 204, description: 'User deleted successfully' })
     @ApiResponse({ status: 404, description: 'User not found' })
     @ApiResponse({ status: 403, description: 'Forbidden - Missing role or permission' })
+    @Audit('users', 'delete')
     async remove(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
         return this.usersService.remove(tenantId, id);
     }

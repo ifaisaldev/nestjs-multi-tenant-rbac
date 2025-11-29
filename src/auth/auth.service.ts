@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { TenantPrismaService } from '@/prisma/tenant-prisma.service';
 import { RegisterDto, LoginDto } from './dto';
+import { AuditService } from '@/audit/audit.service';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +19,7 @@ export class AuthService {
         private prisma: TenantPrismaService,
         private jwtService: JwtService,
         private configService: ConfigService,
+        private auditService: AuditService,
     ) {
         this.bcryptSaltRounds = this.configService.get<number>('app.bcryptSaltRounds', 12);
     }
@@ -105,6 +107,15 @@ export class AuthService {
             // Create session
             await this.createSession(tx, user.id, tokens.refreshToken);
 
+            // Log login event
+            await this.auditService.create({
+                userId: user.id,
+                action: 'LOGIN',
+                resource: 'auth',
+                resourceId: user.id,
+                metadata: { email: user.email },
+            });
+
             // Return user without password
             const { password, ...userWithoutPassword } = user;
 
@@ -173,6 +184,14 @@ export class AuthService {
         return this.prisma.run(async (tx) => {
             // Delete all user sessions
             await tx.$executeRaw`DELETE FROM "sessions" WHERE "userId" = ${userId}`;
+
+            // Log logout event
+            await this.auditService.create({
+                userId: userId,
+                action: 'LOGOUT',
+                resource: 'auth',
+                resourceId: userId,
+            });
 
             return { message: 'Logged out successfully' };
         });

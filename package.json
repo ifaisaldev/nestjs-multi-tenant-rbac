@@ -2,7 +2,7 @@
   "name": "nest-rbac-multitenant",
   "version": "1.0.0",
   "description": "Production-grade Multi-Tenant RBAC System with NestJS",
-  "author": "Mobeen",
+  "author": "Faisal Mehmood",
   "private": true,
   "license": "MIT",
   "scripts": {
