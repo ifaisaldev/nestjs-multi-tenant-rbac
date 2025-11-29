@@ -92,6 +92,11 @@ import { TenantModule } from './tenant/tenant.module';
         // Will add more modules:
     ],
     controllers: [],
-    providers: [],
+    providers: [
+        {
+            provide: 'APP_GUARD',
+            useClass: require('@nestjs/throttler').ThrottlerGuard,
+        },
+    ],
 })
 export class AppModule { }
