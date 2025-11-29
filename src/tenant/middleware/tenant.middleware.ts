@@ -1,26 +1,39 @@
-import { Injectable, NestMiddleware, BadRequestException } from '@nestjs/common';
+import { Injectable, NestMiddleware, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { runWithTenant } from '../tenant-context';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '@/prisma/prisma.service';
 
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
-    constructor(private configService: ConfigService) { }
+    constructor(
+        private configService: ConfigService,
+        private prisma: PrismaService,
+    ) { }
 
-    use(req: Request, res: Response, next: NextFunction) {
+    async use(req: Request, res: Response, next: NextFunction) {
         const headerName = this.configService.get<string>('TENANT_HEADER_NAME') || 'X-Tenant-ID';
-        const tenantId = req.headers[headerName.toLowerCase()] as string;
+        const tenantSlug = req.headers[headerName.toLowerCase()] as string;
 
-        if (!tenantId) {
-            // For public routes, we might not need a tenant, but for now let's enforce it or handle it gracefully
-            // If it's a health check or public route, maybe skip?
-            // But middleware runs before guards.
-            // Let's allow missing tenant for now, but TenantPrismaService will fail if used.
+        if (!tenantSlug) {
             return next();
         }
 
-        runWithTenant(tenantId, () => {
-            next();
-        });
+        try {
+            const tenant = await this.prisma.tenant.findUnique({
+                where: { slug: tenantSlug },
+                select: { schema: true },
+            });
+
+            if (!tenant) {
+                throw new NotFoundException(`Tenant '${tenantSlug}' not found`);
+            }
+
+            runWithTenant(tenant.schema, () => {
+                next();
+            });
+        } catch (error) {
+            next(error);
+        }
     }
 }

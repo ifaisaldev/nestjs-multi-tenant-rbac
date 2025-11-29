@@ -210,7 +210,7 @@ enum AuditAction {
 model AuditLog {
   id         String      @id @default(uuid())
   userId     String
-  action     AuditAction
+  action     String
   resource   String // e.g., "users", "roles"
   resourceId String? // ID of affected resource
   metadata   Json? // Additional context

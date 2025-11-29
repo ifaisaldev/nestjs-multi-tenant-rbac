@@ -28,6 +28,12 @@ export class PermissionsGuard implements CanActivate {
 
         // Get user's permissions from roles
         const userPermissions: Permission[] = user.permissions || [];
+        const userRoles = user.roles?.map((role: any) => role.name) || [];
+
+        // Allow SUPER_ADMIN to bypass permission checks
+        if (userRoles.includes('SUPER_ADMIN')) {
+            return true;
+        }
 
         // Check if user has ALL required permissions (AND logic)
         const hasAllPermissions = requiredPermissions.every((required) =>

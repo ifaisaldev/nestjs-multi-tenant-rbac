@@ -320,6 +320,22 @@ export class TenantService {
             )
         `);
 
+        // Create audit_logs table
+        await this.prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS "audit_logs" (
+                "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                "userId" TEXT NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+                "action" TEXT NOT NULL,
+                "resource" TEXT NOT NULL,
+                "resourceId" TEXT,
+                "metadata" JSONB,
+                "ipAddress" TEXT,
+                "userAgent" TEXT,
+                "createdAt" TIMESTAMP DEFAULT NOW(),
+                "createdBy" TEXT REFERENCES "users"("id") ON DELETE SET NULL
+            )
+        `);
+
         // Reset search path
         await this.prisma.$executeRawUnsafe(`RESET search_path`);
 

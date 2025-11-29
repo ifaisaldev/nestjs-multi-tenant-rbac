@@ -19,6 +19,7 @@ import { AuthModule } from './auth/auth.module';
 import { RbacModule } from './rbac/rbac.module';
 import { UsersModule } from './users/users.module';
 import { TenantModule } from './tenant/tenant.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
     imports: [
