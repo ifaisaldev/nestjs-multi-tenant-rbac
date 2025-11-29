@@ -8,164 +8,134 @@ export class UsersService {
     constructor(private prisma: TenantPrismaService) { }
 
     async findAll(tenantId: string, pagination: { page: number; limit: number }) {
-        await this.prisma.setTenantSchema(tenantId);
+        return this.prisma.run(async (tx) => {
+            const { page, limit } = pagination;
+            const skip = (page - 1) * limit;
 
-        const { page, limit } = pagination;
-        const skip = (page - 1) * limit;
+            const [users, total] = await Promise.all([
+                tx.user.findMany({
+                    skip,
+                    take: limit,
+                    orderBy: { createdAt: 'desc' },
+                    select: {
+                        id: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        status: true,
+                        createdAt: true,
+                        roles: {
+                            select: {
+                                role: {
+                                    select: {
+                                        name: true,
+                                        displayName: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                }),
+                tx.user.count(),
+            ]);
 
-        const [users, total] = await Promise.all([
-            this.prisma.user.findMany({
-                skip,
-                take: limit,
-                select: {
-                    id: true,
-                    email: true,
-                    firstName: true,
-                    lastName: true,
-                    phone: true,
-                    status: true,
-                    emailVerified: true,
-                    createdAt: true,
+            return {
+                data: users,
+                meta: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit),
+                },
+            };
+        });
+    }
+
+    async findOne(tenantId: string, id: string) {
+        return this.prisma.run(async (tx) => {
+            const user = await tx.user.findUnique({
+                where: { id },
+                include: {
                     roles: {
                         include: {
                             role: true,
                         },
                     },
                 },
-                orderBy: { createdAt: 'desc' },
-            }),
-            this.prisma.user.count(),
-        ]);
+            });
 
-        return {
-            data: users,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
-        };
-    }
+            if (!user) {
+                throw new NotFoundException(`User with ID ${id} not found`);
+            }
 
-    async findOne(tenantId: string, id: string) {
-        await this.prisma.setTenantSchema(tenantId);
-
-        const user = await this.prisma.user.findUnique({
-            where: { id },
-            select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-                status: true,
-                emailVerified: true,
-                createdAt: true,
-                updatedAt: true,
-                roles: {
-                    include: {
-                        role: {
-                            include: {
-                                permissions: {
-                                    include: {
-                                        permission: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
+            const { password, ...result } = user;
+            return result;
         });
-
-        if (!user) {
-            throw new NotFoundException(`User with ID ${id} not found`);
-        }
-
-        return user;
     }
 
     async create(tenantId: string, createUserDto: CreateUserDto) {
-        await this.prisma.setTenantSchema(tenantId);
+        return this.prisma.run(async (tx) => {
+            // Check if user exists
+            const existing = await tx.user.findUnique({
+                where: { email: createUserDto.email },
+            });
 
-        // Check if user exists
-        const existing = await this.prisma.user.findUnique({
-            where: { email: createUserDto.email },
+            if (existing) {
+                throw new ConflictException('User with this email already exists');
+            }
+
+            // Hash password
+            const hashedPassword = await bcrypt.hash(createUserDto.password, 12);
+
+            // Create user
+            const user = await tx.user.create({
+                data: {
+                    ...createUserDto,
+                    password: hashedPassword,
+                    status: 'PENDING_VERIFICATION',
+                },
+            });
+
+            const { password, ...result } = user;
+            return result;
         });
-
-        if (existing) {
-            throw new ConflictException('User with this email already exists');
-        }
-
-        // Hash password
-        const hashedPassword = await bcrypt.hash(createUserDto.password, 12);
-
-        // Create user
-        const user = await this.prisma.user.create({
-            data: {
-                email: createUserDto.email,
-                password: hashedPassword,
-                firstName: createUserDto.firstName,
-                lastName: createUserDto.lastName,
-                phone: createUserDto.phone,
-                status: 'ACTIVE',
-            },
-            select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-                status: true,
-                createdAt: true,
-            },
-        });
-
-        return user;
     }
 
     async update(tenantId: string, id: string, updateUserDto: UpdateUserDto) {
-        await this.prisma.setTenantSchema(tenantId);
+        return this.prisma.run(async (tx) => {
+            // Check if user exists
+            const existing = await tx.user.findUnique({ where: { id } });
+            if (!existing) {
+                throw new NotFoundException(`User with ID ${id} not found`);
+            }
 
-        // Check if user exists
-        await this.findOne(tenantId, id);
+            if (updateUserDto.password) {
+                updateUserDto.password = await bcrypt.hash(updateUserDto.password, 12);
+            }
 
-        // Update user
-        const user = await this.prisma.user.update({
-            where: { id },
-            data: {
-                ...updateUserDto,
-                password: updateUserDto.password
-                    ? await bcrypt.hash(updateUserDto.password, 12)
-                    : undefined,
-            },
-            select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                phone: true,
-                status: true,
-                updatedAt: true,
-            },
+            const user = await tx.user.update({
+                where: { id },
+                data: updateUserDto,
+            });
+
+            const { password, ...result } = user;
+            return result;
         });
-
-        return user;
     }
 
     async remove(tenantId: string, id: string) {
-        await this.prisma.setTenantSchema(tenantId);
+        return this.prisma.run(async (tx) => {
+            // Check if user exists
+            const existing = await tx.user.findUnique({ where: { id } });
+            if (!existing) {
+                throw new NotFoundException(`User with ID ${id} not found`);
+            }
 
-        // Check if user exists
-        await this.findOne(tenantId, id);
+            await tx.user.delete({
+                where: { id },
+            });
 
-        // Soft delete (update status to INACTIVE)
-        await this.prisma.user.update({
-            where: { id },
-            data: { status: 'INACTIVE' },
+            return { message: 'User deleted successfully' };
         });
-
-        return { message: 'User deleted successfully' };
     }
 }

@@ -15,30 +15,30 @@ async function seed() {
     console.log('Creating roles...');
 
     const superAdminRole = await prisma.$queryRawUnsafe(
-        `INSERT INTO roles (id, name, display_name, description, is_system, priority, created_at, updated_at)
+        `INSERT INTO "${tenantId}".roles (id, name, "displayName", description, "isSystem", priority, "createdAt", "updatedAt")
      VALUES (gen_random_uuid(), 'SUPER_ADMIN', 'Super Administrator', 'Full system access with all permissions', true, 100, NOW(), NOW())
-     ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
+     ON CONFLICT (name) DO UPDATE SET "updatedAt" = NOW()
      RETURNING *`
     );
 
     const adminRole = await prisma.$queryRawUnsafe(
-        `INSERT INTO roles (id, name, display_name, description, is_system, priority, created_at, updated_at)
+        `INSERT INTO "${tenantId}".roles (id, name, "displayName", description, "isSystem", priority, "createdAt", "updatedAt")
      VALUES (gen_random_uuid(), 'ADMIN', 'Administrator', 'Tenant administration and user management', true, 80, NOW(), NOW())
-     ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
+     ON CONFLICT (name) DO UPDATE SET "updatedAt" = NOW()
      RETURNING *`
     );
 
     const managerRole = await prisma.$queryRawUnsafe(
-        `INSERT INTO roles (id, name, display_name, description, is_system, priority, created_at, updated_at)
+        `INSERT INTO "${tenantId}".roles (id, name, "displayName", description, "isSystem", priority, "createdAt", "updatedAt")
      VALUES (gen_random_uuid(), 'MANAGER', 'Manager', 'Team and resource management', true, 50, NOW(), NOW())
-     ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
+     ON CONFLICT (name) DO UPDATE SET "updatedAt" = NOW()
      RETURNING *`
     );
 
     const userRole = await prisma.$queryRawUnsafe(
-        `INSERT INTO roles (id, name, display_name, description, is_system, priority, created_at, updated_at)
+        `INSERT INTO "${tenantId}".roles (id, name, "displayName", description, "isSystem", priority, "createdAt", "updatedAt")
      VALUES (gen_random_uuid(), 'USER', 'User', 'Basic user access', true, 10, NOW(), NOW())
-     ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
+     ON CONFLICT (name) DO UPDATE SET "updatedAt" = NOW()
      RETURNING *`
     );
 
@@ -72,9 +72,9 @@ async function seed() {
 
     for (const perm of permissions) {
         await prisma.$queryRawUnsafe(
-            `INSERT INTO permissions (id, resource, action, description, created_at, updated_at)
-       VALUES (gen_random_uuid(), '${perm.resource}', '${perm.action}', '${perm.description}', NOW(), NOW())
-       ON CONFLICT (resource, action) DO UPDATE SET description = '${perm.description}', updated_at = NOW()`
+            `INSERT INTO "${tenantId}".permissions (id, resource, action, description, "createdAt")
+       VALUES (gen_random_uuid(), '${perm.resource}', '${perm.action}', '${perm.description}', NOW())
+       ON CONFLICT (resource, action) DO UPDATE SET description = '${perm.description}'`
         );
     }
 
@@ -85,46 +85,46 @@ async function seed() {
 
     // SUPER_ADMIN gets all permissions
     await prisma.$queryRawUnsafe(`
-    INSERT INTO role_permissions (id, role_id, permission_id, created_at)
+    INSERT INTO "${tenantId}".role_permissions (id, "roleId", "permissionId", "createdAt")
     SELECT gen_random_uuid(), r.id, p.id, NOW()
-    FROM roles r
-    CROSS JOIN permissions p
+    FROM "${tenantId}".roles r
+    CROSS JOIN "${tenantId}".permissions p
     WHERE r.name = 'SUPER_ADMIN'
-    ON CONFLICT (role_id, permission_id) DO NOTHING
+    ON CONFLICT ("roleId", "permissionId") DO NOTHING
   `);
 
     // ADMIN gets most permissions except system-level
     await prisma.$queryRawUnsafe(`
-    INSERT INTO role_permissions (id, role_id, permission_id, created_at)
+    INSERT INTO "${tenantId}".role_permissions (id, "roleId", "permissionId", "createdAt")
     SELECT gen_random_uuid(), r.id, p.id, NOW()
-    FROM roles r
-    CROSS JOIN permissions p
+    FROM "${tenantId}".roles r
+    CROSS JOIN "${tenantId}".permissions p
     WHERE r.name = 'ADMIN' 
     AND p.action IN ('create', 'read', 'update', 'list', 'assign')
-    ON CONFLICT (role_id, permission_id) DO NOTHING
+    ON CONFLICT ("roleId", "permissionId") DO NOTHING
   `);
 
     // MANAGER gets read and update permissions
     await prisma.$queryRawUnsafe(`
-    INSERT INTO role_permissions (id, role_id, permission_id, created_at)
+    INSERT INTO "${tenantId}".role_permissions (id, "roleId", "permissionId", "createdAt")
     SELECT gen_random_uuid(), r.id, p.id, NOW()
-    FROM roles r
-    CROSS JOIN permissions p
+    FROM "${tenantId}".roles r
+    CROSS JOIN "${tenantId}".permissions p
     WHERE r.name = 'MANAGER' 
     AND p.action IN ('read', 'update', 'list')
     AND p.resource = 'users'
-    ON CONFLICT (role_id, permission_id) DO NOTHING
+    ON CONFLICT ("roleId", "permissionId") DO NOTHING
   `);
 
     // USER gets only read permissions
     await prisma.$queryRawUnsafe(`
-    INSERT INTO role_permissions (id, role_id, permission_id, created_at)
+    INSERT INTO "${tenantId}".role_permissions (id, "roleId", "permissionId", "createdAt")
     SELECT gen_random_uuid(), r.id, p.id, NOW()
-    FROM roles r
-    CROSS JOIN permissions p
+    FROM "${tenantId}".roles r
+    CROSS JOIN "${tenantId}".permissions p
     WHERE r.name = 'USER' 
     AND p.action = 'read'
-    ON CONFLICT (role_id, permission_id) DO NOTHING
+    ON CONFLICT ("roleId", "permissionId") DO NOTHING
   `);
 
     console.log('✓ Permissions assigned to roles');
@@ -164,9 +164,9 @@ async function seed() {
     for (const testUser of testUsers) {
         // Create user
         const userResult: any = await prisma.$queryRawUnsafe(
-            `INSERT INTO users (id, email, password, first_name, last_name, status, created_at, updated_at)
+            `INSERT INTO "${tenantId}".users (id, email, password, "firstName", "lastName", status, "createdAt", "updatedAt")
        VALUES (gen_random_uuid(), '${testUser.email}', '${hashedPassword}', '${testUser.firstName}', '${testUser.lastName}', 'ACTIVE', NOW(), NOW())
-       ON CONFLICT (email) DO UPDATE SET updated_at = NOW()
+       ON CONFLICT (email) DO UPDATE SET "updatedAt" = NOW()
        RETURNING id`
         );
 
@@ -174,11 +174,11 @@ async function seed() {
 
         // Assign role to user
         await prisma.$queryRawUnsafe(`
-      INSERT INTO user_roles (id, user_id, role_id, assigned_by, assigned_at, created_at)
-      SELECT gen_random_uuid(), '${userId}', r.id, '${userId}', NOW(), NOW()
-      FROM roles r
+      INSERT INTO "${tenantId}".user_roles (id, "userId", "roleId", "assignedBy", "assignedAt")
+      SELECT gen_random_uuid(), '${userId}', r.id, '${userId}', NOW()
+      FROM "${tenantId}".roles r
       WHERE r.name = '${testUser.role}'
-      ON CONFLICT (user_id, role_id) DO NOTHING
+      ON CONFLICT ("userId", "roleId") DO NOTHING
     `);
 
         console.log(`  ✓ Created ${testUser.email} with role ${testUser.role}`);
