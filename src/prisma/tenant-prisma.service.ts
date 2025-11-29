@@ -1,6 +1,7 @@
-import { Injectable, Scope, Logger } from '@nestjs/common';
+import { Injectable, Scope, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
+import { getTenantId } from '../tenant/tenant-context';
 
 /**
  * Tenant-Scoped Prisma Service
@@ -8,7 +9,7 @@ import { PrismaClient } from '@prisma/client';
  * Scope: REQUEST - each request gets its own instance
  */
 @Injectable({ scope: Scope.REQUEST })
-export class TenantPrismaService extends PrismaClient {
+export class TenantPrismaService extends PrismaClient implements OnModuleInit {
     private readonly logger = new Logger(TenantPrismaService.name);
     private tenantSchema: string;
 
@@ -20,38 +21,31 @@ export class TenantPrismaService extends PrismaClient {
         });
     }
 
+    async onModuleInit() {
+        // We can't set schema here because it's too early for request scope? 
+        // Actually onModuleInit is called when the module is initialized, but for REQUEST scope it might be different.
+        // However, we should try to set it when we connect.
+    }
+
     /**
-     * Set the tenant schema for this request
-     * Must be called before any database operations
+     * Execute a function within the tenant context (transaction with search_path set)
      */
-    async setTenantSchema(schemaName: string): Promise<void> {
-        if (!schemaName) {
-            throw new Error('Tenant schema name is required');
+    async run<T>(fn: (prisma: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>): Promise<T> {
+        const tenantId = getTenantId();
+        if (!tenantId) {
+            throw new Error('Tenant ID not found in context');
         }
 
-        this.tenantSchema = schemaName;
-
-        // Set the PostgreSQL search_path to the tenant schema
-        await this.$executeRawUnsafe(`SET search_path TO "${schemaName}"`);
-
-        this.logger.debug(`🔄 Switched to tenant schema: ${schemaName}`);
+        return this.$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(`SET search_path TO "${tenantId}"`);
+            return fn(tx as any);
+        });
     }
 
     /**
-     * Get current tenant schema
-     */
-    getTenantSchema(): string {
-        return this.tenantSchema;
-    }
-
-    /**
-     * Override connect to ensure schema is set
+     * Override connect - no longer needed to set schema here as we use transactions
      */
     async $connect() {
         await super.$connect();
-
-        if (this.tenantSchema) {
-            await this.$executeRawUnsafe(`SET search_path TO "${this.tenantSchema}"`);
-        }
     }
 }

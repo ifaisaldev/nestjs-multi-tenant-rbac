@@ -18,6 +18,7 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { RbacModule } from './rbac/rbac.module';
 import { UsersModule } from './users/users.module';
+import { TenantModule } from './tenant/tenant.module';
 
 @Module({
     imports: [
@@ -83,6 +84,7 @@ import { UsersModule } from './users/users.module';
         // Authentication & Authorization
         AuthModule,
         RbacModule,
+        TenantModule,
 
         // Business modules
         UsersModule,
