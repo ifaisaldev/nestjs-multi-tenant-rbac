@@ -4,6 +4,14 @@ import { PrismaClient } from '@prisma/client';
 import { getTenantId } from '../tenant/tenant-context';
 
 /**
+ * Type for Prisma Client within a transaction
+ */
+export type PrismaTransactionClient = Omit<
+    PrismaClient,
+    '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+/**
  * Tenant-Scoped Prisma Service
  * Creates a Prisma client instance connected to a specific tenant's schema
  * Scope: REQUEST - each request gets its own instance
@@ -30,7 +38,7 @@ export class TenantPrismaService extends PrismaClient implements OnModuleInit {
     /**
      * Execute a function within the tenant context (transaction with search_path set)
      */
-    async run<T>(fn: (prisma: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>): Promise<T> {
+    async run<T>(fn: (prisma: PrismaTransactionClient) => Promise<T>): Promise<T> {
         const tenantId = getTenantId();
         if (!tenantId) {
             throw new Error('Tenant ID not found in context');
@@ -38,7 +46,7 @@ export class TenantPrismaService extends PrismaClient implements OnModuleInit {
 
         return this.$transaction(async (tx) => {
             await tx.$executeRawUnsafe(`SET search_path TO "${tenantId}"`);
-            return fn(tx as any);
+            return fn(tx as PrismaTransactionClient);
         });
     }
 
